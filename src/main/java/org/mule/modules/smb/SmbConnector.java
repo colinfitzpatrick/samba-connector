@@ -16,6 +16,7 @@ import org.mule.api.annotations.SourceStrategy;
 import org.mule.api.annotations.SourceThreadingModel;
 import org.mule.api.annotations.lifecycle.OnException;
 import org.mule.api.annotations.param.Default;
+import org.mule.api.annotations.param.InboundHeaders;
 import org.mule.api.annotations.param.Payload;
 import org.mule.api.callback.SourceCallback;
 import org.mule.modules.smb.config.ConnectorConfig;
@@ -49,10 +50,7 @@ public class SmbConnector {
     	
     	logger.info(">>SMB CONNECTOR COPY FILE BEGIN");
     	Boolean isWriteSuccessful = false;
-    	
-    	
-    	
-    	try {
+     	try {
             NtlmPasswordAuthentication auth = this.getAuth();
 			
 			String path = "smb://" + config.getHost() + "/" + config.getFolder() + "/"+fileName+"."+printerFileExtensionType;
@@ -86,11 +84,11 @@ public class SmbConnector {
 	* 	The inbound receiver polls for files in a specified smb share and creates a message for Mule to process.
 	* 	The polling period is configurable in the Connector.
 	*
-	*	@param filePattern to poll
+	*	@param filePattern The file pattern to poll
 	*	@param sourceCallback
 	*/    
     
-    @Source(threadingModel=SourceThreadingModel.SINGLE_THREAD, sourceStrategy=SourceStrategy.POLLING, pollingPeriod=1000, name="receiver")
+    @Source(sourceStrategy=SourceStrategy.POLLING, pollingPeriod=1000, name="receiver")
     public void receiver(final String filePattern, final SourceCallback sourceCallback) {
     	logger.debug(">> SMB POLLING BEGIN FOR " + config.getFolder());
 		List<String> files = new ArrayList();
@@ -113,6 +111,8 @@ public class SmbConnector {
 						logger.debug("<< SMB CONNECTOR FILE FOUND " + fileList[i].getPath());
 					}
 				}
+			} else {
+				logger.info("A file with the filename pattern '" + filePattern + "'could not be found.");
 			}
 		} catch (SmbException e) {
             if (e.getMessage().equals("The system cannot find the file specified.")) {
@@ -130,7 +130,7 @@ public class SmbConnector {
 	* 	Returns a list of files from SMB Share based on a file pattern
 	*
 	*	@param payload 
-	*	@param filePattrn 
+	*	@param filePattrn The file pattern to poll
 	*	@return list of files
 	*/
 	@Processor  
@@ -168,7 +168,7 @@ public class SmbConnector {
 	*	Message processor that can be directly called to read a specified File	
 	*
 	*	@param payload
-	*	@param smbPath is the File Path
+	*	@param smbPath The path of the file to read.
 	*	@return returns file contents as byte array
 	*/
 	@Processor
@@ -184,11 +184,7 @@ public class SmbConnector {
 			String path = smbPath;
 			
 			sFile = new SmbFile(path,auth);		
-			inFile = new SmbFileInputStream(sFile);
-			byte[] sBytes = IOUtils.toByteArray(inFile);
-			inFile.close();
-			logger.debug("<< SMB CONNECTOR READ FILE ENDÍ");
-			return sBytes;
+			return readFileContents(sFile);
 			
 		} catch (Exception e) {
 			logger.error(e);	
@@ -200,7 +196,7 @@ public class SmbConnector {
     * 	Deletes a specified file
     *
 	*	@param payload
-	*	@param smbPath is the File Path
+	*	@param smbPath The path of the file to delete.
 	*	@return returns boolean to indicate successful deletion of a file
     */
     @Processor
@@ -227,6 +223,37 @@ public class SmbConnector {
          logger.debug("<< SMB CONNECTOR DELETE FILE END");   
          return true;
      }
+
+	/**
+     * 	Moves a specified file to the output folder
+     *
+ 	*	@param smbOriginalFilePath The original file path
+ 	* 	@param smbFilePath The current file path
+ 	*	@return returns boolean to indicate successful move of a file
+     */
+     @Processor
+     public boolean moveFile(@InboundHeaders("smbOriginalFilePath") String smbOriginalFilePath, @InboundHeaders("smbFilePath") String smbFilePath) {
+          
+     	 logger.debug(">> SMB CONNECTOR DELETE FILE BEGIN");
+         SmbFile sFile, tFile = null;
+          
+          try {
+              NtlmPasswordAuthentication auth = this.getAuth();
+              
+              String targetPath = "smb://" + config.getHost() + "/" + config.getOutputFolder() + "/" + smbOriginalFilePath.substring(smbOriginalFilePath.lastIndexOf('/') + 1);;
+              sFile = new SmbFile(smbFilePath,auth);  
+              logger.info("TARGET PATH " + targetPath);
+              tFile = new SmbFile(targetPath,auth);
+              sFile.renameTo(tFile);       
+          } catch (Exception e) {
+              logger.error(e);
+              logger.debug("<< SMB CONNECTOR DELETE FILE END");
+              return false;
+          }
+          
+          logger.debug("<< SMB CONNECTOR DELETE FILE END");   
+          return true;
+    }
     
 	protected byte[] readFileContents(SmbFile sFile) {
 		
