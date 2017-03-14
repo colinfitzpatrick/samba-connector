@@ -13,6 +13,7 @@ import org.mule.api.annotations.Connector;
 import org.mule.api.annotations.Processor;
 import org.mule.api.annotations.Source;
 import org.mule.api.annotations.SourceStrategy;
+import org.mule.api.annotations.SourceThreadingModel;
 import org.mule.api.annotations.lifecycle.OnException;
 import org.mule.api.annotations.param.Default;
 import org.mule.api.annotations.param.Payload;
@@ -24,6 +25,7 @@ import org.mule.util.IOUtils;
 import com.ning.http.client.providers.netty.Callback;
 
 import jcifs.smb.NtlmPasswordAuthentication;
+import jcifs.smb.SmbException;
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbFileInputStream;
 import jcifs.smb.SmbFileOutputStream;
@@ -87,32 +89,41 @@ public class SmbConnector {
 	*	@param filePattern to poll
 	*	@param sourceCallback
 	*/    
-    @Source(sourceStrategy=SourceStrategy.POLLING, pollingPeriod=1000, name="receiver")
+    
+    @Source(threadingModel=SourceThreadingModel.SINGLE_THREAD, sourceStrategy=SourceStrategy.POLLING, pollingPeriod=1000, name="receiver")
     public void receiver(final String filePattern, final SourceCallback sourceCallback) {
+    	logger.debug(">> SMB POLLING BEGIN FOR " + config.getFolder());
 		List<String> files = new ArrayList();
 		
         NtlmPasswordAuthentication auth = this.getAuth();
 		
 		String path = "smb://" + config.getHost() + "/" + config.getFolder() + "/";
-		
 		try {
 			SmbFile resource = new SmbFile(path,auth);
-			if (resource.isFile()) {
-				files.add(resource.getPath());
-				logger.debug(">> SMB CONNECTOR FILE FOUND " + resource.getPath());
-			} else if (resource.list().length > 0) {
+			if (resource.list().length > 0) {
 				SmbFile[] fileList = resource.listFiles(filePattern);
 				for (int i=0; i<fileList.length; i++) {
-					HashMap props = new HashMap();
-					props.put("smbFilePath", fileList[i].getPath());
-					sourceCallback.process(this.readAFile(fileList[i].getPath()),props);
-					logger.debug("<< SMB CONNECTOR FILE FOUND " + fileList[i].getPath());
+					if (validateFile(fileList[i])) {
+						HashMap props = new HashMap();
+						props.put("smbOriginalFilePath", fileList[i].getPath());
+						SmbFile renamedResource = new SmbFile(fileList[i].getPath()+".processing",auth);
+						fileList[i].renameTo(renamedResource);
+						props.put("smbFilePath",renamedResource.getPath());
+						sourceCallback.process(this.readFileContents(renamedResource),props);
+						logger.debug("<< SMB CONNECTOR FILE FOUND " + fileList[i].getPath());
+					}
 				}
 			}
+		} catch (SmbException e) {
+            if (e.getMessage().equals("The system cannot find the file specified.")) {
+                logger.info("A file with the filename pattern '" + filePattern + "'could not be found.");
+            } else {
+            	logger.error(e);
+            }
 		} catch (Exception e) {
 			logger.error(e);
 		}
-		
+		logger.debug("<< SMB POLLING COMPLETE FOR "  + config.getFolder());
     }
     
 	/**
@@ -130,26 +141,25 @@ public class SmbConnector {
         NtlmPasswordAuthentication auth = this.getAuth();
 		
 		String path = "smb://" + config.getHost() + "/" + config.getFolder() + "/";
-		logger.info("TARGET PATH = " + path);
-		
-		try {
-			SmbFile resource = new SmbFile(path,auth);
-			if (resource.isFile()) {
-				files.add(resource.getPath());
-				logger.info(">> FILE FOUND " + resource.getPath());
-			} else if (resource.list().length > 0) {
-				SmbFile[] fileList = resource.listFiles(filePattern);
-				for (int i=0; i<fileList.length; i++) {
-					files.add(fileList[i].getPath());
-					logger.info(">> FILE FOUND " + fileList[i].getPath());
+		logger.debug("TARGET PATH = " + path);
+			try {
+				SmbFile resource = new SmbFile(path,auth);
+				if (resource.isFile()) {
+					files.add(resource.getPath());
+					logger.debug(">> FILE FOUND " + resource.getPath());
+				} else if (resource.list().length > 0) {
+					SmbFile[] fileList = resource.listFiles(filePattern);
+					for (int i=0; i<fileList.length; i++) {
+						files.add(fileList[i].getPath());
+						logger.debug(">> FILE FOUND " + fileList[i].getPath());
+					}
 				}
+			} catch (Exception e) {
+				logger.error(e);
+				logger.debug("<< SMB CONNECTOR GET FILES END");
+				return null;
 			}
-		} catch (Exception e) {
-			logger.error(e);
-			logger.debug("<< SMB CONNECTOR GET FILES END");
-			return null;
-		}
-		
+
 		logger.debug(">>SMB CONNECTOR GET FILES END");
 		return files;
 	}
@@ -163,44 +173,6 @@ public class SmbConnector {
 	*/
 	@Processor
 	public byte[] readFile(@Payload String payload, String smbPath) {			
-		return readAFile(smbPath);			
-	}  
- 
-	/**
-    * 	Deletes a specified file
-    *
-	*	@param payload
-	*	@param smbPath is the File Path
-	*	@return returns boolean to indicate successful deletion of a file
-    */
-    @Processor
-    public boolean deleteFile(@Payload String payload, String smbPath) {
-         
-    	 logger.debug(">> SMB CONNECTOR DELETE FILE BEGIN");
-         SmbFile sFile = null;
-         
-         try {
-             NtlmPasswordAuthentication auth = this.getAuth();
-             
-             String path = smbPath;
-             logger.info("TARGET PATH = " + path);
-             
-             sFile = new SmbFile(path,auth);  
-             sFile.delete();
-            
-         } catch (Exception e) {
-             logger.error(e);
-             logger.debug("<< SMB CONNECTOR DELETE FILE END");
-             return false;
-         }
-         
-         logger.debug("<< SMB CONNECTOR DELETE FILE END");   
-         return true;
-     }
-
-
-	public byte[] readAFile(String smbPath) {
-		
 		logger.debug(">> SMB CONNECTOR READ FILE BEGIN");
 		
 		SmbFileInputStream inFile = null;
@@ -220,11 +192,85 @@ public class SmbConnector {
 			
 		} catch (Exception e) {
 			logger.error(e);	
-			logger.debug("<< SMB CONNECTOR READ FILE END");
+			return null;
+		}		
+	}  
+ 
+	/**
+    * 	Deletes a specified file
+    *
+	*	@param payload
+	*	@param smbPath is the File Path
+	*	@return returns boolean to indicate successful deletion of a file
+    */
+    @Processor
+    public boolean deleteFile(@Payload String payload, String smbPath) {
+         
+    	 logger.debug(">> SMB CONNECTOR DELETE FILE BEGIN");
+         SmbFile sFile = null;
+         
+         try {
+             NtlmPasswordAuthentication auth = this.getAuth();
+             
+             String path = smbPath;
+             logger.debug("TARGET PATH = " + path);
+             
+             sFile = new SmbFile(path,auth);  
+             sFile.delete();
+            
+         } catch (Exception e) {
+             logger.error(e);
+             logger.debug("<< SMB CONNECTOR DELETE FILE END");
+             return false;
+         }
+         
+         logger.debug("<< SMB CONNECTOR DELETE FILE END");   
+         return true;
+     }
+    
+	protected byte[] readFileContents(SmbFile sFile) {
+		
+		logger.debug(">> SMB CONNECTOR READ FILE CONTENT BEGIN");
+		
+		SmbFileInputStream inFile = null;
+		
+		try {
+			inFile = new SmbFileInputStream(sFile);
+			byte[] sBytes = IOUtils.toByteArray(inFile);
+			inFile.close();
+			logger.debug("<< SMB CONNECTOR READ FILE CONTENT END");
+			return sBytes;
+			
+		} catch (Exception e) {
+			logger.error(e);	
+			logger.debug("<< SMB CONNECTOR READ FILE CONTENT END");
 			return null;
 		}
 			
 	}  	
+	
+    protected boolean validateFile(SmbFile file)
+    {
+        if (config.getCheckFileAge())
+        {
+            long fileAge = config.getFileAge();
+            long lastMod = file.getLastModified();
+            long now = System.currentTimeMillis();
+            long thisFileAge = now - lastMod;
+
+            logger.debug("fileAge = " + thisFileAge + ", expected = " + fileAge + ", now = " + now
+                         + ", lastMod = " + lastMod);
+            if (thisFileAge < fileAge)
+            {
+                if (logger.isInfoEnabled())
+                {
+                    logger.info("The file has not aged enough yet, will return nothing for: " + file.getName());
+                }
+                return false;
+            }
+        }
+        return true;
+    }
 	     
     private NtlmPasswordAuthentication getAuth() {
         return new NtlmPasswordAuthentication(config.getDomain() == null ? "" : config.getDomain(), config.getUsername(), config.getPassword());

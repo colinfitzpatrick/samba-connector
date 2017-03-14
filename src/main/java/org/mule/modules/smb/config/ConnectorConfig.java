@@ -1,24 +1,38 @@
 package org.mule.modules.smb.config;
 
 import org.mule.api.annotations.components.Configuration;
+import org.mule.api.annotations.param.Default;
+import org.mule.api.annotations.param.Optional;
 import org.mule.api.annotations.Configurable;
+
 
 @Configuration(friendlyName = "Configuration")
 public class ConnectorConfig {
 
     @Configurable
    	private String username;
+    
     @Configurable
 	private String password;
+    
     @Configurable
     private String host;
+    
     @Configurable
+    @Optional
     private String domain;
+    
     @Configurable
     private String folder;
     
-
+    @Configurable
+    @Optional
+    @Default("false") 
+    private boolean checkFileAge;
     
+    @Configurable
+    @Optional
+    private long fileAge;
     
 	public String getUsername() {
 		return username;
@@ -50,5 +64,16 @@ public class ConnectorConfig {
 	public void setFolder(String folder) {
 		this.folder = folder;
 	}
-
+	public boolean getCheckFileAge() {
+		return checkFileAge;
+	}
+	public void setCheckFileAge(boolean checkFileAge) {
+		this.checkFileAge = checkFileAge;
+	}
+	public long getFileAge() {
+		return fileAge;
+	}
+	public void setFileAge(long fileAge) {
+		this.fileAge = fileAge;
+	}	
 }
