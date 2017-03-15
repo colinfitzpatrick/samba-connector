@@ -43,6 +43,9 @@
         <AsyncLogger name="org.jetel" level="WARN"/>
         <AsyncLogger name="Tracking" level="WARN"/>
         
+        <!-- Mule Connector -->
+         <AsyncLogger name="org.mule.modules.smb" level="WARN"/>
+        
         <AsyncRoot level="INFO">
             <AppenderRef ref="file" />
         </AsyncRoot>

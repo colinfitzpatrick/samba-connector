@@ -1,16 +1,39 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns:smb="http://www.mulesoft.org/schema/mule/smb" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:smb="http://www.mulesoft.org/schema/mule/smb" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
 	xmlns:spring="http://www.springframework.org/schema/beans" 
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
 http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
-http://www.mulesoft.org/schema/mule/smb http://www.mulesoft.org/schema/mule/smb/current/mule-smb.xsd">
-    <smb:config name="Smb__Configuration" username="${samba.username}" password="${samba.password}" host="${samba.host}" domain="${samba.domain}" folder="${samba.folder}" checkFileAge="true" fileAge="${samba.fileAge}" doc:name="Smb: Configuration" outputFolder="${samba.outputFolder}"/>
-    <flow name="samba-testappFlow">
-        <smb:receiver config-ref="Smb__Configuration" filePattern="*.txt" pollingPeriod="10000" doc:name="Smb Connector"/>
+http://www.mulesoft.org/schema/mule/smb http://www.mulesoft.org/schema/mule/smb/current/mule-smb.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+    <smb:config name="Smb__Configuration_TXT" username="${samba.username}" password="${samba.password}" host="${samba.host}" domain="${samba.domain}" folder="${samba.folder}" checkFileAge="true" fileAge="${samba.fileAge}" doc:name="Smb: Configuration" outputFolder="${samba.outputFolder}"/>
+    <smb:config name="Smb__Configuration_CSV" username="${samba.username}" password="${samba.password}" host="${samba.host}" domain="${samba.domain}" folder="${samba.folder.other}" doc:name="Smb: Configuration"/>
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <smb:config name="Smb__Configuration_WRITER" username="${samba.username}" password="${samba.password}" host="${samba.host}" folder="${samba.folder.write}" doc:name="Smb: Configuration" domain="${samba.domain}"/>
+    <flow name="samba-testappFlow-copy">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/write" doc:name="HTTP"/>
+        <set-payload value="Saved Content From Connetctor" doc:name="Set Payload"/>
+        <smb:copy-file config-ref="Smb__Configuration_WRITER" fileName="#[message.inboundProperties.'http.query.params'.filename]" printerFileExtensionType="txt" doc:name="Write File"/>
+        <set-payload value="Test Completed" doc:name="Set Payload"/>
+    </flow>
+    <flow name="samba-testappFlow-read">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/read" doc:name="HTTP"/>
+        <smb:read-file config-ref="Smb__Configuration_WRITER" fileName="#[message.inboundProperties.'http.query.params'.filename].txt" doc:name="Read File"/>
+        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+        <logger message="File Content From Read #[payload]" level="INFO" doc:name="Logger"/>
+    </flow>
+    <flow name="samba-testappFlow-source-archive">
+        <smb:receiver config-ref="Smb__Configuration_TXT" filePattern="*.txt" pollingPeriod="10000" doc:name="Smb Connector"/>
         <byte-array-to-string-transformer doc:name="Byte Array to String"/>
         <logger message="File Contents: #[payload]" level="INFO" doc:name="Logger"/>
-        <smb:move-file config-ref="Smb__Configuration" doc:name="Archive File"/>
+        <smb:move-file config-ref="Smb__Configuration_TXT" doc:name="Archive File"/>
+    </flow>
+    <flow name="samba-testappFlow-source-delete">
+        <smb:receiver config-ref="Smb__Configuration_CSV" filePattern="*.csv" pollingPeriod="10000" doc:name="Smb Conntector"/>
+        <byte-array-to-object-transformer doc:name="Byte Array to Object"/>
+        <logger message="File Contents: #[payload]" level="INFO" doc:name="Logger"/>
+        <smb:delete-file config-ref="Smb__Configuration_CSV" doc:name="Delete File"/>
     </flow>
 </mule>

@@ -1,0 +1,34 @@
+<metadata__catalog__entry>
+  <version>5.2.0.0</version>
+  <types class="tree-map">
+    <entry>
+      <org.mule.common.metadata.DefaultMetaDataKey>
+        <id>java.lang.Boolean</id>
+        <displayName>java.lang.Boolean</displayName>
+        <category>DEFAULT</category>
+        <metaDataKeyPropertiesManager>
+          <properties>
+            <org.mule.common.metadata.key.property.dsql.DsqlFromMetaDataKeyProperty/>
+          </properties>
+        </metaDataKeyPropertiesManager>
+      </org.mule.common.metadata.DefaultMetaDataKey>
+      <org.mule.common.metadata.DefaultPojoMetaDataModel>
+        <implementationClass>java.lang.Boolean</implementationClass>
+        <dataType>POJO</dataType>
+        <metaDataModelPropertiesManager>
+          <properties/>
+        </metaDataModelPropertiesManager>
+        <fields/>
+        <clazzName>java.lang.Boolean</clazzName>
+        <isInterface>false</isInterface>
+        <name>Boolean</name>
+        <parentNames>
+          <string>java.lang.Comparable</string>
+          <string>java.lang.Object</string>
+          <string>java.io.Serializable</string>
+        </parentNames>
+      </org.mule.common.metadata.DefaultPojoMetaDataModel>
+    </entry>
+  </types>
+  <connectorName>Smb__Configuration_WRITER</connectorName>
+</metadata__catalog__entry>
