@@ -1,8 +1,5 @@
 package org.mule.modules.smb;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -13,17 +10,13 @@ import org.mule.api.annotations.Connector;
 import org.mule.api.annotations.Processor;
 import org.mule.api.annotations.Source;
 import org.mule.api.annotations.SourceStrategy;
-import org.mule.api.annotations.SourceThreadingModel;
 import org.mule.api.annotations.lifecycle.OnException;
-import org.mule.api.annotations.param.Default;
 import org.mule.api.annotations.param.InboundHeaders;
 import org.mule.api.annotations.param.Payload;
 import org.mule.api.callback.SourceCallback;
 import org.mule.modules.smb.config.ConnectorConfig;
 import org.mule.modules.smb.error.ErrorHandler;
 import org.mule.util.IOUtils;
-
-import com.ning.http.client.providers.netty.Callback;
 
 import jcifs.smb.NtlmPasswordAuthentication;
 import jcifs.smb.SmbException;
@@ -107,7 +100,8 @@ public class SmbConnector {
 						SmbFile renamedResource = new SmbFile(fileList[i].getPath()+".processing",auth);
 						fileList[i].renameTo(renamedResource);
 						props.put("smbFilePath",renamedResource.getPath());
-						sourceCallback.process(this.readFileContents(renamedResource),props);
+						//sourceCallback.process(this.readFileContents(renamedResource),props);
+						sourceCallback.process(renamedResource,props);
 						logger.debug("<< SMB CONNECTOR FILE FOUND " + fileList[i].getPath());
 					}
 				}
@@ -167,24 +161,16 @@ public class SmbConnector {
 	/**
 	*	Message processor that can be directly called to read a specified File	
 	*
-	*	@param payload
-	*	@param smbPath The path of the file to read.
+	*	@param payload The SmbFile object to read
 	*	@return returns file contents as byte array
 	*/
 	@Processor
-	public byte[] readFile(@Payload String payload, String smbPath) {			
+	public byte[] readFile(@Payload SmbFile payload) {			
 		logger.debug(">> SMB CONNECTOR READ FILE BEGIN");
 		
-		SmbFileInputStream inFile = null;
-		SmbFile sFile = null;
-		
 		try {
-            NtlmPasswordAuthentication auth = this.getAuth();
-			
-			String path = smbPath;
-			
-			sFile = new SmbFile(path,auth);		
-			return readFileContents(sFile);
+	
+			return readFileContents(payload);
 			
 		} catch (Exception e) {
 			logger.error(e);	
@@ -195,24 +181,16 @@ public class SmbConnector {
 	/**
     * 	Deletes a specified file
     *
-	*	@param payload
-	*	@param smbPath The path of the file to delete.
+	*	@param payload The SmbFile object to delete
 	*	@return returns boolean to indicate successful deletion of a file
     */
     @Processor
-    public boolean deleteFile(@Payload String payload, String smbPath) {
+    public boolean deleteFile(@Payload SmbFile payload) {
          
     	 logger.debug(">> SMB CONNECTOR DELETE FILE BEGIN");
-         SmbFile sFile = null;
          
          try {
-             NtlmPasswordAuthentication auth = this.getAuth();
-             
-             String path = smbPath;
-             logger.debug("TARGET PATH = " + path);
-             
-             sFile = new SmbFile(path,auth);  
-             sFile.delete();
+        	 payload.delete();
             
          } catch (Exception e) {
              logger.error(e);
@@ -228,30 +206,31 @@ public class SmbConnector {
      * 	Moves a specified file to the output folder
      *
  	*	@param smbOriginalFilePath The original file path
- 	* 	@param smbFilePath The current file path
+ 	* 	@param smbFilePath The SmbFile object to move
  	*	@return returns boolean to indicate successful move of a file
      */
      @Processor
-     public boolean moveFile(@InboundHeaders("smbOriginalFilePath") String smbOriginalFilePath, @InboundHeaders("smbFilePath") String smbFilePath) {
-          
-     	 logger.debug(">> SMB CONNECTOR DELETE FILE BEGIN");
+     public boolean moveFile(@Payload SmbFile payload, @InboundHeaders("smbOriginalFilePath") String smbOriginalFilePath) {          
+     	 logger.debug(">> SMB CONNECTOR MOVE FILE BEGIN");
          SmbFile sFile, tFile = null;
           
           try {
               NtlmPasswordAuthentication auth = this.getAuth();
               
               String targetPath = "smb://" + config.getHost() + "/" + config.getOutputFolder() + "/" + smbOriginalFilePath.substring(smbOriginalFilePath.lastIndexOf('/') + 1);;
-              sFile = new SmbFile(smbFilePath,auth);  
-              logger.info("TARGET PATH " + targetPath);
+              logger.debug("TARGET PATH " + targetPath);
               tFile = new SmbFile(targetPath,auth);
-              sFile.renameTo(tFile);       
+              if (tFile.exists()) {
+            	  tFile.delete();
+              }
+              payload.renameTo(tFile);       
           } catch (Exception e) {
               logger.error(e);
-              logger.debug("<< SMB CONNECTOR DELETE FILE END");
+              logger.debug("<< SMB CONNECTOR MOVE FILE END");
               return false;
           }
           
-          logger.debug("<< SMB CONNECTOR DELETE FILE END");   
+          logger.debug("<< SMB CONNECTOR MOVE FILE END");   
           return true;
     }
     
