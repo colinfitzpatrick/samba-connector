@@ -11,6 +11,8 @@ import org.mule.api.annotations.Processor;
 import org.mule.api.annotations.Source;
 import org.mule.api.annotations.SourceStrategy;
 import org.mule.api.annotations.lifecycle.OnException;
+import org.mule.api.annotations.lifecycle.Start;
+import org.mule.api.annotations.lifecycle.Stop;
 import org.mule.api.annotations.param.InboundHeaders;
 import org.mule.api.annotations.param.Payload;
 import org.mule.api.callback.SourceCallback;
@@ -96,21 +98,24 @@ public class SmbConnector {
 				for (int i=0; i<fileList.length; i++) {
 					if (validateFile(fileList[i])) {
 						HashMap props = new HashMap();
-						props.put("smbOriginalFilePath", fileList[i].getPath());
+						props.put("smbOriginalFile", fileList[i].getPath());
 						SmbFile renamedResource = new SmbFile(fileList[i].getPath()+".processing",auth);
+						if (renamedResource.exists())
+							renamedResource.delete();
 						fileList[i].renameTo(renamedResource);
-						props.put("smbFilePath",renamedResource.getPath());
-						//sourceCallback.process(this.readFileContents(renamedResource),props);
-						sourceCallback.process(renamedResource,props);
+						props.put("smbFile",renamedResource.getPath());
+						props.put("smbPath",path);
+						props.put("smbObject",renamedResource);
+						sourceCallback.process(this.readFileContents(renamedResource),props);
 						logger.debug("<< SMB CONNECTOR FILE FOUND " + fileList[i].getPath());
 					}
 				}
 			} else {
-				logger.info("A file with the filename pattern '" + filePattern + "'could not be found.");
+				logger.debug("A file with the filename pattern '" + filePattern + "'could not be found.");
 			}
 		} catch (SmbException e) {
             if (e.getMessage().equals("The system cannot find the file specified.")) {
-                logger.info("A file with the filename pattern '" + filePattern + "'could not be found.");
+                logger.debug("A file with the filename pattern '" + filePattern + "'could not be found.");
             } else {
             	logger.error(e);
             }
@@ -119,7 +124,7 @@ public class SmbConnector {
 		}
 		logger.debug("<< SMB POLLING COMPLETE FOR "  + config.getFolder());
     }
-    
+
 	/**
 	* 	Returns a list of files from SMB Share based on a file pattern
 	*
@@ -161,16 +166,19 @@ public class SmbConnector {
 	/**
 	*	Message processor that can be directly called to read a specified File	
 	*
-	*	@param payload The SmbFile object to read
+	*	@param fileName The name of the file to read (excluding path)
 	*	@return returns file contents as byte array
 	*/
 	@Processor
-	public byte[] readFile(@Payload SmbFile payload) {			
+	public byte[] readFile(@Payload String payload, String fileName) {			
 		logger.debug(">> SMB CONNECTOR READ FILE BEGIN");
+
+        NtlmPasswordAuthentication auth = this.getAuth();
 		
+		String path = "smb://" + config.getHost() + "/" + config.getFolder() + "/";
 		try {
-	
-			return readFileContents(payload);
+			SmbFile resource = new SmbFile(path,auth);		
+			return readFileContents(resource);
 			
 		} catch (Exception e) {
 			logger.error(e);	
@@ -179,19 +187,18 @@ public class SmbConnector {
 	}  
  
 	/**
-    * 	Deletes a specified file
+    * 	Deletes a specified file. Requires the SmbFile object.
     *
-	*	@param payload The SmbFile object to delete
+	*	@param SmbFile The SmbFile object to delete
 	*	@return returns boolean to indicate successful deletion of a file
     */
     @Processor
-    public boolean deleteFile(@Payload SmbFile payload) {
+    public boolean deleteFile(@InboundHeaders("smbObject") SmbFile smbObject) {
          
     	 logger.debug(">> SMB CONNECTOR DELETE FILE BEGIN");
          
          try {
-        	 payload.delete();
-            
+        	 smbObject.delete();           
          } catch (Exception e) {
              logger.error(e);
              logger.debug("<< SMB CONNECTOR DELETE FILE END");
@@ -203,27 +210,27 @@ public class SmbConnector {
      }
 
 	/**
-     * 	Moves a specified file to the output folder
-     *
- 	*	@param smbOriginalFilePath The original file path
- 	* 	@param smbFilePath The SmbFile object to move
- 	*	@return returns boolean to indicate successful move of a file
-     */
+	* 	Moves a specified file to the output folder. Requires inbound properties to be set.
+	*
+	*	@param smbOriginalFilePath The original file path
+	* 	@param smbFilePath The SmbFile object to move
+	*	@return returns boolean to indicate successful move of a file
+	*/
      @Processor
-     public boolean moveFile(@Payload SmbFile payload, @InboundHeaders("smbOriginalFilePath") String smbOriginalFilePath) {          
+     public boolean moveFile(@InboundHeaders("smbObject") SmbFile smbObject, @InboundHeaders("smbOriginalFile") String smbOriginalFilePath) {          
      	 logger.debug(">> SMB CONNECTOR MOVE FILE BEGIN");
-         SmbFile sFile, tFile = null;
-          
+         SmbFile targetFile = null;
+
+         if (config.getOutputFolder()!=null)  {
           try {
-              NtlmPasswordAuthentication auth = this.getAuth();
-              
+              NtlmPasswordAuthentication auth = this.getAuth();           
               String targetPath = "smb://" + config.getHost() + "/" + config.getOutputFolder() + "/" + smbOriginalFilePath.substring(smbOriginalFilePath.lastIndexOf('/') + 1);;
               logger.debug("TARGET PATH " + targetPath);
-              tFile = new SmbFile(targetPath,auth);
-              if (tFile.exists()) {
-            	  tFile.delete();
+              targetFile = new SmbFile(targetPath,auth);
+              if (targetFile.exists()) {
+            	  targetFile.delete();
               }
-              payload.renameTo(tFile);       
+              smbObject.renameTo(targetFile);       
           } catch (Exception e) {
               logger.error(e);
               logger.debug("<< SMB CONNECTOR MOVE FILE END");
@@ -232,6 +239,11 @@ public class SmbConnector {
           
           logger.debug("<< SMB CONNECTOR MOVE FILE END");   
           return true;
+         } else {
+        	 logger.error("The output folder must be specified to move a file");
+        	 return false;
+         }
+         
     }
     
 	protected byte[] readFileContents(SmbFile sFile) {
