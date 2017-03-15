@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:smb="http://www.mulesoft.org/schema/mule/smb" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/smb http://www.mulesoft.org/schema/mule/smb/current/mule-smb.xsd">
+    <smb:config name="Smb__Configuration" username="${samba.username}" password="${samba.password}" host="${samba.host}" domain="${samba.domain}" folder="${samba.folder}" checkFileAge="true" fileAge="${samba.fileAge}" doc:name="Smb: Configuration" outputFolder="${samba.outputFolder}"/>
+    <flow name="samba-testappFlow">
+        <smb:receiver config-ref="Smb__Configuration" filePattern="*.txt" pollingPeriod="10000" doc:name="Smb Connector"/>
+        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+        <logger message="File Contents: #[payload]" level="INFO" doc:name="Logger"/>
+        <smb:move-file config-ref="Smb__Configuration" doc:name="Archive File"/>
+    </flow>
+</mule>
