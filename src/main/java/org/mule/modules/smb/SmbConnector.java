@@ -196,17 +196,17 @@ public class SmbConnector {
     @Processor
     public boolean deleteFile(SmbFile smbObject) {
          
-    	 logger.debug(">> SMB CONNECTOR DELETE FILE BEGIN");
+    	 logger.info(">> SMB CONNECTOR DELETE FILE BEGIN");
          
          try {
         	 smbObject.delete();           
          } catch (Exception e) {
              logger.error(e);
-             logger.debug("<< SMB CONNECTOR DELETE FILE END");
+             logger.info("<< SMB CONNECTOR DELETE FILE END");
              return false;
          }
          
-         logger.debug("<< SMB CONNECTOR DELETE FILE END");   
+         logger.info("<< SMB CONNECTOR DELETE FILE END");   
          return true;
      }
 
@@ -291,7 +291,7 @@ public class SmbConnector {
         return true;
     }
 	     
-    private NtlmPasswordAuthentication getAuth() {
+    public NtlmPasswordAuthentication getAuth() {
         return new NtlmPasswordAuthentication(config.getDomain() == null ? "" : config.getDomain(), config.getUsername(), config.getPassword());
     }
      
