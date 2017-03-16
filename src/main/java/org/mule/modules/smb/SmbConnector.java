@@ -98,12 +98,12 @@ public class SmbConnector {
 				for (int i=0; i<fileList.length; i++) {
 					if (validateFile(fileList[i])) {
 						HashMap props = new HashMap();
-						props.put("smbOriginalFile", fileList[i].getPath());
+						props.put("smbOriginalFilename", fileList[i].getPath());
 						SmbFile renamedResource = new SmbFile(fileList[i].getPath()+".processing",auth);
 						if (renamedResource.exists())
 							renamedResource.delete();
 						fileList[i].renameTo(renamedResource);
-						props.put("smbFile",renamedResource.getPath());
+						props.put("smbFilename",renamedResource.getPath());
 						props.put("smbPath",path);
 						props.put("smbObject",renamedResource);
 						sourceCallback.process(this.readFileContents(renamedResource),props);
@@ -170,13 +170,14 @@ public class SmbConnector {
 	*	@return returns file contents as byte array
 	*/
 	@Processor
-	public byte[] readFile(@Payload String payload, String fileName) {			
+	public byte[] readFile(String fileName) {			
 		logger.debug(">> SMB CONNECTOR READ FILE BEGIN");
 
         NtlmPasswordAuthentication auth = this.getAuth();
 		
-		String path = "smb://" + config.getHost() + "/" + config.getFolder() + "/";
+		String path = "smb://" + config.getHost() + "/" + config.getFolder() + "/" + fileName;
 		try {
+			logger.debug(">> TARGET PATH " + path);
 			SmbFile resource = new SmbFile(path,auth);		
 			return readFileContents(resource);
 			
@@ -193,7 +194,7 @@ public class SmbConnector {
 	*	@return returns boolean to indicate successful deletion of a file
     */
     @Processor
-    public boolean deleteFile(@InboundHeaders("smbObject") SmbFile smbObject) {
+    public boolean deleteFile(SmbFile smbObject) {
          
     	 logger.debug(">> SMB CONNECTOR DELETE FILE BEGIN");
          
@@ -212,19 +213,19 @@ public class SmbConnector {
 	/**
 	* 	Moves a specified file to the output folder. Requires inbound properties to be set.
 	*
-	*	@param smbOriginalFilePath The original file path
-	* 	@param smbFilePath The SmbFile object to move
+	*	@param smbObject The SmbFile object of the processing file
+	*	@param smbOriginalFile The original file path
 	*	@return returns boolean to indicate successful move of a file
 	*/
      @Processor
-     public boolean moveFile(@InboundHeaders("smbObject") SmbFile smbObject, @InboundHeaders("smbOriginalFile") String smbOriginalFilePath) {          
+     public boolean moveFile(SmbFile smbObject, String smbOriginalFilename) {          
      	 logger.debug(">> SMB CONNECTOR MOVE FILE BEGIN");
          SmbFile targetFile = null;
 
          if (config.getOutputFolder()!=null)  {
           try {
               NtlmPasswordAuthentication auth = this.getAuth();           
-              String targetPath = "smb://" + config.getHost() + "/" + config.getOutputFolder() + "/" + smbOriginalFilePath.substring(smbOriginalFilePath.lastIndexOf('/') + 1);;
+              String targetPath = "smb://" + config.getHost() + "/" + config.getOutputFolder() + "/" + smbOriginalFilename.substring(smbOriginalFilename.lastIndexOf('/') + 1);;
               logger.debug("TARGET PATH " + targetPath);
               targetFile = new SmbFile(targetPath,auth);
               if (targetFile.exists()) {

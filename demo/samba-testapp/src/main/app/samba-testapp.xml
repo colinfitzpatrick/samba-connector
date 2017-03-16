@@ -28,12 +28,11 @@ http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/htt
         <smb:receiver config-ref="Smb__Configuration_TXT" filePattern="*.txt" pollingPeriod="10000" doc:name="Smb Connector"/>
         <byte-array-to-string-transformer doc:name="Byte Array to String"/>
         <logger message="File Contents: #[payload]" level="INFO" doc:name="Logger"/>
-        <smb:move-file config-ref="Smb__Configuration_TXT" doc:name="Archive File"/>
     </flow>
     <flow name="samba-testappFlow-source-delete">
         <smb:receiver config-ref="Smb__Configuration_CSV" filePattern="*.csv" pollingPeriod="10000" doc:name="Smb Conntector"/>
         <byte-array-to-object-transformer doc:name="Byte Array to Object"/>
         <logger message="File Contents: #[payload]" level="INFO" doc:name="Logger"/>
-        <smb:delete-file config-ref="Smb__Configuration_CSV" doc:name="Delete File"/>
+        <smb:delete-file config-ref="Smb__Configuration_CSV" doc:name="Delete File" smbObject-ref="#[message.inboundProperties.smbObject]"/>
     </flow>
 </mule>
