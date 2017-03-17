@@ -36,15 +36,15 @@ public class SourceTestCases extends BaseSmbTestCase{
     }
 
     @Test
-    public void testSource() throws InterruptedException {
+    public void verify() throws InterruptedException {
     	Thread.sleep(2000);
         List<Object> events = getDispatcher().getSourceMessages(eventSource);
         assertTrue(!events.isEmpty());
         byte[] expected = (TestProperties.TEST_EXPECTED_PAYLOAD).getBytes();
         byte[] contents = (byte[]) events.get(0);
         assertEquals(Arrays.toString(contents), Arrays.toString(expected));
-    }
-
+    } 
+    
     @After
     public void tearDown() throws Throwable{
 		String path = "smb://" + host + "/" + folder + "/" + fileName + "." + printerFileExtensionType + ".processing";
@@ -52,5 +52,6 @@ public class SourceTestCases extends BaseSmbTestCase{
 		getConnector().deleteFile(sFile);
     	getDispatcher().shutDownSource(eventSource);
     }
+    
 	
 }

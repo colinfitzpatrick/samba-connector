@@ -21,7 +21,7 @@ import org.mule.modules.smb.automation.functional.SourceTestCases;
 @SuiteClasses({ ReadFileTestCases.class, CopyFileTestCases.class, DeleteFileTestCases.class, GetFilesTestCases.class,
 		MoveFileTestCases.class, SourceTestCases.class })
 
-public class FunctionalTestSuite {
+public class FunctionalSuiteTest {
 
 	@BeforeClass
 	public static void initialiseSuite() {
