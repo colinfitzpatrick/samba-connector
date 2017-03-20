@@ -25,7 +25,7 @@ public class GetFilesTestCases extends BaseSmbTestCase {
 
 	@Before
 	public void setup() {
-		getConnector().copyFile(payload, printerFileExtensionType, fileName);	
+		getConnector().copyFile(payload, printerFileExtensionType, fileName, null);	
 	}
 
 	@After

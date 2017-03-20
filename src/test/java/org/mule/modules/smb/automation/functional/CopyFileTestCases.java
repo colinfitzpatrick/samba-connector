@@ -37,7 +37,7 @@ public class CopyFileTestCases extends BaseSmbTestCase {
 	@Test
 	public void verify() {
 		java.lang.Boolean expected = true;
-		assertEquals(getConnector().copyFile(payload, printerFileExtensionType, fileName), expected);
+		assertEquals(getConnector().copyFile(payload, printerFileExtensionType, fileName, null), expected);
 
 	}
 

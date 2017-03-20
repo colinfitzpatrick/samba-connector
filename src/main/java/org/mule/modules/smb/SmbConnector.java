@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.apache.log4j.Logger;
 import org.mule.api.annotations.Config;
+import org.mule.api.annotations.Configurable;
 import org.mule.api.annotations.Connector;
 import org.mule.api.annotations.Processor;
 import org.mule.api.annotations.Source;
@@ -14,6 +15,7 @@ import org.mule.api.annotations.lifecycle.OnException;
 import org.mule.api.annotations.lifecycle.Start;
 import org.mule.api.annotations.lifecycle.Stop;
 import org.mule.api.annotations.param.InboundHeaders;
+import org.mule.api.annotations.param.Optional;
 import org.mule.api.annotations.param.Payload;
 import org.mule.api.callback.SourceCallback;
 import org.mule.modules.smb.config.ConnectorConfig;
@@ -41,14 +43,21 @@ public class SmbConnector {
      * @return A greeting message
      */
     @Processor
-    public Boolean copyFile(@Payload String payload, String printerFileExtensionType, String fileName) {
+    public Boolean copyFile(@Payload String payload, String printerFileExtensionType, String fileName, @Optional String folder) {
     	
     	logger.info(">>SMB CONNECTOR COPY FILE BEGIN");
     	Boolean isWriteSuccessful = false;
      	try {
             NtlmPasswordAuthentication auth = this.getAuth();
 			
-			String path = "smb://" + config.getHost() + "/" + config.getFolder() + "/"+fileName+"."+printerFileExtensionType;
+            //String folder = null;
+            String path = null;
+            
+            if(folder == null)
+            	path = "smb://" + config.getHost() + "/" + config.getFolder() + "/"+fileName+"."+printerFileExtensionType;
+            else
+            	path = "smb://" + config.getHost() + "/" + folder + "/"+fileName+"."+printerFileExtensionType;
+            	
 			logger.info("TARGET PATH = " + path);
 			
 			SmbFile sFile = new SmbFile(path,auth);
